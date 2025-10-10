@@ -1,6 +1,6 @@
 # NLP Group 45
 
-**Note:** I am not very sure about every result but thought this could work as a skeleton for further development? Also, think I saved the test in train-validate-test structure. That needs to be implemented.
+**Note:** I am not very sure about every result but thought this could work as a skeleton for further development? 
 
 ## Part 0 - Overview
 Did a draft of the questions below, mainly to structure the repo. Feel free to change whatever. 
@@ -9,7 +9,7 @@ Did a draft of the questions below, mainly to structure the repo. Feel free to c
 - [x] 1(a) Vocabulary size captured (`01_embeddings.ipynb`).
 - [x] 1(b) OOV counts per topic computed.
 - [ ] 1(c) Did a placeholder mitigation where I assigned the mean embedding to OOV words. If someone comes up with something smart, please add. 
-- [x] 1(d) Top-token embeddings visualised. Looks ok but prob need refinement.
+- [x] 1(d) Top-token embeddings visualised. Looks ok but prob need refinement. Maybe they look dubious because of the OOV mitigation strategy? 
 
     <img src="plots/part1_top_tokens_pca.png" width="380" alt="Part1 PCA" />
     <img src="plots/part1_top_tokens_tsne.png" width="380" alt="Part1 t-SNE" />
