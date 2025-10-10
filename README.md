@@ -34,7 +34,7 @@ Did a draft of the questions below, mainly to structure the repo. Feel free to c
     <img src="plots/part3_bigru_curves.png" width="300" alt="biGRU curves" />
     <img src="plots/part3_cnn_curves.png" width="300" alt="CNN curves" />
 
-    <img src="plots/part3_bilstm_topic_accuracy.png" width="300" alt="biLSTM topic accuracy" />
+    <img src="plots/part3_bilstm_topic_accuracy.png" width="300" alt="biLSTM topic accuracy (not plotted!)" />
     <img src="plots/part3_bigru_topic_accuracy.png" width="300" alt="biGRU topic accuracy" />
     <img src="plots/part3_cnn_topic_accuracy.png" width="300" alt="CNN topic accuracy" />
 
