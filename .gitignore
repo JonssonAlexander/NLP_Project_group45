@@ -2,3 +2,4 @@ z_assist/*
 __pycache__
 .vector_cache
 notebooks
+03_enhancements.ipynb
