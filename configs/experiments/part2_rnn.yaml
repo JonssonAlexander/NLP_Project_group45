@@ -1,0 +1,27 @@
+# Baseline RNN experiment configuration
+
+experiment_name: part2_rnn_baseline
+seed: 7
+
+training:
+  epochs: 20
+  batch_size: 64
+  learning_rate: 0.001
+  weight_decay: 0.0
+  grad_clip: 1.0
+  optimizer: adam
+
+model:
+  hidden_dim: 128
+  num_layers: 1
+  dropout: 0.3
+  pooling: last_hidden  # options: last_hidden, mean, max, attention
+
+regularisation_options:
+  dropout: [0.0, 0.3, 0.5]
+  weight_decay: [0.0, 1e-5, 1e-4]
+  grad_clip: [0.0, 1.0, 5.0]
+
+logging:
+  output_dir: logs/part2
+  save_best_model: true

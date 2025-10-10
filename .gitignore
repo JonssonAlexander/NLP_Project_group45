@@ -1,0 +1,4 @@
+z_assist/*
+__pycache__
+.vector_cache
+notebooks

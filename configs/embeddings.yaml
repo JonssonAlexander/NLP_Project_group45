@@ -1,0 +1,9 @@
+# Embedding configuration.
+#
+# Point `file_path` to the pretrained embedding vectors you intend to use.
+# Example assumes GloVe 6B 100d vectors placed under `data/glove/`.
+
+file_path: ../data/glove/glove.6B.100d.txt
+embedding_dim: 100
+trainable: true
+random_seed: 7

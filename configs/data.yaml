@@ -1,0 +1,19 @@
+# Base data configuration for the TREC assignment.
+#
+# Adjust these paths or parameters as needed for experimentation. The notebooks
+# should load this file to keep environment assumptions in one place.
+
+dataset_root: data/raw
+train_filename: train_5500.label
+test_filename: TREC_10.label
+train_split_ratio: 0.8
+shuffle_seed: 42
+tokenisation:
+  use_spacy: true
+  language_model: en_core_web_sm
+  lower: true
+vocabulary:
+  min_freq: 1
+  specials:
+    - "<pad>"
+    - "<unk>"
