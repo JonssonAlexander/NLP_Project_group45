@@ -63,7 +63,11 @@ def ensure_dataset_local(paths: TrecDatasetPaths, overwrite: bool = False) -> No
     _download(TREC_TEST_URL, paths.test_path)
 
 
-def read_labeled_questions(path: Path, encoding: str = "latin-1") -> Iterable[Tuple[str, str]]:
+def read_labeled_questions(
+    path: Path,
+    encoding: str = "latin-1",
+    fine_grained: bool = False,
+) -> Iterable[Tuple[str, str]]:
     """
     Parse a raw TREC file into (label, question) tuples.
 
@@ -80,6 +84,10 @@ def read_labeled_questions(path: Path, encoding: str = "latin-1") -> Iterable[Tu
             if not line:
                 continue
             label, question = line.split(" ", 1)
+            
+            if not fine_grained:
+                label = label.split(":")[0]
+            
             yield label, question
 
 

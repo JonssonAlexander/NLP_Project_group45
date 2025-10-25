@@ -45,8 +45,12 @@ def prepare_tokenised_splits(config: DataConfig) -> TokenisedDatasets:
     )
     ensure_dataset_local(paths)
 
-    train_examples = _materialise(read_labeled_questions(paths.train_path))
-    test_examples = _materialise(read_labeled_questions(paths.test_path))
+    train_examples = _materialise(
+        read_labeled_questions(paths.train_path, fine_grained=config.fine_grained)
+    )
+    test_examples = _materialise(
+        read_labeled_questions(paths.test_path, fine_grained=config.fine_grained)
+    )
 
     shuffled = shuffle_examples(train_examples, config.shuffle_seed)
     train_split, validation_split = split_train_validation(shuffled, config.train_split_ratio)

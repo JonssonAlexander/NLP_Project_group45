@@ -27,6 +27,7 @@ class DataConfig:
     test_filename: str
     train_split_ratio: float
     shuffle_seed: int
+    fine_grained: bool
     tokenisation: TokenisationConfig
     vocabulary_min_freq: int
     vocabulary_specials: tuple[str, ...]
@@ -54,6 +55,7 @@ def load_data_config(path: Path) -> DataConfig:
         test_filename=payload["test_filename"],
         train_split_ratio=float(payload["train_split_ratio"]),
         shuffle_seed=int(payload["shuffle_seed"]),
+        fine_grained=bool(payload.get("fine_grained", False)),
         tokenisation=token_config,
         vocabulary_min_freq=int(vocab_payload.get("min_freq", 1)),
         vocabulary_specials=tuple(vocab_payload.get("specials", ("<pad>", "<unk>"))),
