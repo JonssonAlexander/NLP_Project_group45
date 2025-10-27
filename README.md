@@ -46,13 +46,13 @@ The highest OOV counts appear in `DESC:def` (definition questions) and `HUM:ind`
 
 ### Question 1(c): OOV Mitigation Strategy
 
-The strategy used was global mean vector initialization, which is as follows:
+The strategy used was global mean vector initialisation, which is as follows:
 
 1. Computing the global mean of all in-vocabulary embedding vectors (excluding special tokens `<pad>`, `<unk>` and OOV tokens themselves)
 2. Assigning this mean vector to all OOV tokens as their initial representation
 3. Keeping embeddings trainable so the model can adapt OOV vectors during training
 
-The reasoning for this is that it provides a more meaningful initialization than random noise, positions OOV tokens near the semantic "centroid" of the vocabulary, and allows the model to fine-tune these vectors based on task-specific context during training. It's also computationally efficient and simple to implement.
+The reasoning for this is that it provides a more meaningful initialisation than random noise, positions OOV tokens near the semantic "centroid" of the vocabulary, and allows the model to fine-tune these vectors based on task-specific context during training. It's also computationally efficient and simple to implement.
 
 Code snippet for the mitigation strategy is in `src/embeddings.py`:
 
@@ -91,36 +91,112 @@ def mitigate_oov_embeddings(
     return mitigated
 ```
 
-This approach successfully mitigated 197 OOV tokens plus 2 special tokens (`<pad>`, `<unk>`), which resulted in 199 initialized vectors.
+This approach successfully mitigated 197 OOV tokens plus 2 special tokens (`<pad>`, `<unk>`), which resulted in 199 initialised vectors.
 
 ---
 
-### Question 1(d): Embedding Visualization
+### Question 1(d): Embedding Visualisation
 
 We selected the top 20 most frequent tokens from each topic category (after removing stopwords) and projected their `GloVe` embeddings into 2D space using both `PCA` and `t-SNE` (perplexity=15).
 
 <img src="plots/part1_top_tokens_pca.png" width="400" alt="PCA projection of top tokens" />
 <img src="plots/part1_top_tokens_tsne.png" width="400" alt="t-SNE projection of top tokens" />
 
-#### Some key observations:
+#### Some observations:
 
-- Tokens from similar categories (e.g., NUM-related topics) show spatial proximity, indicating that `GloVe` captures meaningful semantic relationships
-- Question-specific tokens (e.g., `who`, `what`, `when`) cluster distinctly, reflecting their differing semantic roles
-- Some categories overlap (particularly DESC subcategories), which is expected since definition and description questions share similar vocabulary
-- `t-SNE` reveals more granular local structure while `PCA` preserves global variance; both confirm reasonable semantic organization
+Tokens from similar categories (e.g., NUM-related topics) show spatial proximity, showing that `GloVe` captures meaningful semantic relationships.
 
-The visualizations suggest that pretrained `GloVe` embeddings provide a solid foundation for topic classification, with question-type-specific tokens occupying distinct semantic regions.
+Question-specific tokens (e.g., `who`, `what`, `when`) cluster distinctly, which reflects their different semantic roles.
+
+Some categories overlap (particularly `DESC` subcategories), which is expected since definition and description questions share similar vocabulary.
+
+`t-SNE` reveals more granular local structure while `PCA` preserves global variance, which confirms reasonable semantic organisation.
+
+The visualisations suggest that pretrained `GloVe` embeddings provide a solid foundation for topic classification, with question-type-specific tokens occupying distinct semantic regions.
 
 ## Part 2 – RNN Baseline
 
-- [x] 2(a) Best configuration (see `02_rnn.ipynb`).
-- [x] 2(b) Regularisation sweep complete with "no regularisation" as control. Don't know about this one but think we have an ok grid?
-- [x] 2(c) Training curves. Validation accuracy sort of plateaus near the best epoch, maybe double check this.
-- [x] 2(d) Sentence pooling strategies compared (`pooling_df`). Did mean, max and attention variants. They seem to be improving the accuracy.
-- [x] 2(e) Topic-wise accuracy.
+The assignment uses coarse-grained classification with 6 topic categories: `ABBR`, `DESC`, `ENTY`, `HUM`, `LOC`, `NUM`. Raw data labels like `DESC:def` are automatically converted to coarse labels like `DESC` during data loading (see `fine_grained: false` in `configs/data.yaml`).
 
-<img src="plots/part2_rnn_baseline_curves.png" width="380" alt="RNN baseline curves" />
-<img src="plots/part2_topic_accuracy.png" width="380" alt="Baseline topic accuracy" />
+### Question 2(a): Best Configuration
+
+After regularisation and pooling strategy
+comparison with fixed architecture
+hyperparameters, the optimal RNN configuration achieved 79.2% test accuracy:
+
+- Architecture: Simple RNN (tanh)
+- Pooling: Max pooling
+- Hidden dimension: 128
+- Dropout: 0.0
+- Weight decay: 0.0
+- Gradient clipping: 1.0
+- Learning rate: 0.001
+- Optimiser: Adam
+- Batch size: 64
+- Best epoch: 15 (early stopping with patience=3)
+
+The best configuration used max pooling without additional regularisation beyond gradient clipping and early stopping.
+
+### Question 2(b): Regularisation Strategies
+
+We tested multiple regularisation techniques to prevent overfitting:
+
+#### Control baseline (no regularization):
+
+- Dropout = 0.0, weight decay = 0.0
+- Test accuracy: 64.2%
+
+#### Techniques tested:
+
+1. Dropout with values from grid of [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+2. L2 weight decay with values from grid of [0.0, 1e-6, 6e-6, 4e-5, 2.5e-4, 1.6e-3, 1e-2]
+3. Gradient clipping fixed at 1.0 to prevent exploding gradients
+4. Early stopping with patience of 3 epochs and monitoring validation accuracy
+
+Total configurations tested: 49 (7 dropout × 7 weight_decay). The best regularisation combination was dropout=0.0 with weight_decay=6e-6, achieving 69.2% test accuracy.
+
+### Question 2(c): Training Curves
+
+<img src="plots/part2_rnn_baseline_curves.png" width="400" alt="RNN baseline curves" />
+<img src="plots/part2_best_rnn_curves.png" width="400" alt="Best RNN curves" />
+
+The training curves show good and consistent learning. Training loss steadily decreases while validation loss starts stabilising around epoch 12-14. The validation accuracy plateaus near the best epoch (14-15), with minimal gap between training and validation curves. The model converges within 15 epochs.
+
+### Question 2(d): Sentence Aggregation Methods
+
+We compared four strategies for aggregating RNN hidden states into sentence representations:
+
+| Pooling Strategy | Test Accuracy | Best Epoch |
+| ---------------- | ------------- | ---------- |
+| Max pooling      | 78.4%         | 14         |
+| Attention        | 78.4%         | 14         |
+| Mean pooling     | 71.2%         | 15         |
+| Last hidden      | 67.2%         | 15         |
+
+All pooling methods handle variable-length sequences using padding masks. Max pooling applies element-wise max over non-padded positions, mean pooling computes weighted averages using actual sequence lengths, attention pooling learns weights via a linear layer + softmax, and last hidden uses the final RNN state.
+
+Max pooling and attention pooling perform equally well (both 78.4%), outperforming mean pooling (+7%) and last hidden (+11%). Max pooling was selected for the final model because it doesn't require additional parameters, unlike attention which adds a learned weight layer.
+
+### Question 2(e): Topic-wise Accuracy
+
+Per-topic performance on the test set:
+
+| Topic | Accuracy | Support |
+| ----- | -------- | ------- |
+| DESC  | 79%      | 138     |
+| LOC   | 77%      | 81      |
+| HUM   | 73%      | 65      |
+| ENTY  | 65%      | 94      |
+| NUM   | 52%      | 113     |
+| ABBR  | 18%      | 9       |
+
+<img src="plots/part2_topic_accuracy.png" width="400" alt="Baseline topic accuracy" />
+
+`ABBR` has the lowest accuracy (18%), likely because it has very limited support (only 9 test examples) and questions like "What does NASA stand for?" require factual knowledge beyond the general linguistic patterns. `NUM` is the second weakest (52%), probably due to semantic ambiguity between dates, counts, and percentages that share similar phrasing.
+
+`DESC` performs best (79%) as the largest category with clear linguistic markers like "What is..." and "How does...". `LOC` (77%) and `HUM` (73%) also perform well due to unambiguous patterns like "Where..." and "Who...". `ENTY` shows moderate performance (65%), likely because it covers diverse subcategories (animals, foods, inventions) with overlapping features.
+
+The best model (max pooling without dropout) improves accuracy across all categories compared to the baseline. See `plots/part2_best_topic_accuracy.png` for the improved results.
 
 ## Part 3 – Enhancements
 
