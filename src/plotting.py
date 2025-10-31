@@ -5,8 +5,9 @@ Plotting helpers to keep notebooks focused on storytelling.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
+import locale
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -16,6 +17,40 @@ from sklearn.manifold import TSNE
 
 from .embeddings import Vocabulary
 from .training import TrainingHistory
+
+
+def latex_set_size(width: float = 455.24411, fraction: float = 1) -> tuple[float, float]:
+    """
+    Set figure dimensions to avoid scaling in LaTeX.
+    """
+
+    fig_width_pt = width * fraction
+    inches_per_pt = 1 / 72.27
+    golden_ratio = (5 ** 0.5 - 1) / 2
+
+    fig_width_in = fig_width_pt * inches_per_pt
+    fig_height_in = fig_width_in * golden_ratio
+
+    return fig_width_in, fig_height_in
+
+
+def locale_parameters(locale_name: str = "C") -> dict[str, object]:
+    """
+    Configure matplotlib and locale settings for consistent number formatting.
+    """
+
+    rc_overrides = {
+        "mathtext.fontset": "stix",
+        "font.family": ["STIXGeneral"],
+        "font.serif": ["STIXGeneral"],
+        "font.sans-serif": ["STIXGeneral"],
+        "font.monospace": ["STIXGeneral"],
+    }
+    plt.rcParams.update(rc_overrides)
+
+    locale.setlocale(locale.LC_NUMERIC, locale_name)
+    plt.rcParams["axes.formatter.use_locale"] = locale_name.lower() != "c"
+    return rc_overrides
 
 
 def _prepare_tokens(tokens: Sequence[str] | Sequence[tuple[str, int]]) -> list[str]:
@@ -84,21 +119,38 @@ def plot_embedding_scatter(
     output_path: Path | None = None,
     annotate_tokens: bool = True,
     legend_location: str = "right",
+    figure_size: tuple[float, float] | None = None,
+    figure_fraction: float | None = None,
+    locale_name: str = "C",
+    use_locale: bool = True,
+    sns_style: str = "whitegrid",
+    label_palette: Mapping[str, str] | Sequence[str] | None = None,
+    legend_label_map: Mapping[str, str] | None = None,
+    point_size: float = 80,
 ):
     """
     Scatter plot helper for 2D embedding projections.
     """
 
-    sns.set(style="whitegrid")
-    fig, ax = plt.subplots(figsize=(10, 7))
+    rc = locale_parameters(locale_name) if use_locale else None
+    sns.set(style=sns_style, rc=rc)
 
+    if figure_size is None:
+        if figure_fraction is not None:
+            figure_size = latex_set_size(fraction=figure_fraction)
+        else:
+            figure_size = (10, 7)
+
+    fig, ax = plt.subplots(figsize=figure_size)
+
+    palette = label_palette if label_palette is not None else "tab10"
     sns.scatterplot(
         data=frame,
         x="x",
         y="y",
         hue="label",
-        palette="tab10",
-        s=80,
+        palette=palette,
+        s=point_size,
         ax=ax,
     )
 
@@ -106,21 +158,45 @@ def plot_embedding_scatter(
         for _, row in frame.iterrows():
             ax.text(row["x"] + 0.02, row["y"] + 0.02, row["token"], fontsize=8)
 
+    handles, labels = ax.get_legend_handles_labels()
+    if legend_label_map:
+        remapped_handles: list[Any] = []
+        remapped_labels: list[str] = []
+        seen: set[str] = set()
+        for handle, label in zip(handles, labels):
+            mapped = legend_label_map.get(label, label)
+            if mapped in seen:
+                continue
+            seen.add(mapped)
+            remapped_handles.append(handle)
+            remapped_labels.append(mapped)
+        handles, labels = remapped_handles, remapped_labels
+
     ax.set_title(title)
     ax.set_xlabel("Component 1")
     ax.set_ylabel("Component 2")
 
     if legend_location == "bottom":
         ax.legend(
+            handles,
+            labels,
             title="Topic",
             loc="upper center",
             bbox_to_anchor=(0.5, -0.12),
             ncol=3,
         )
     elif legend_location == "none":
-        ax.legend_.remove()
+        legend_obj = ax.legend_
+        if legend_obj is not None:
+            legend_obj.remove()
     else:
-        ax.legend(title="Topic", bbox_to_anchor=(1.05, 1), loc="upper left")
+        ax.legend(
+            handles,
+            labels,
+            title="Topic",
+            bbox_to_anchor=(1.05, 1),
+            loc="upper left",
+        )
 
     fig.tight_layout()
 
@@ -142,6 +218,14 @@ def plot_top_tokens_projection(
     annotate_tokens: bool = True,
     legend_location: str = "right",
     tsne_perplexity: float = 30.0,
+    figure_size: tuple[float, float] | None = None,
+    figure_fraction: float | None = None,
+    locale_name: str = "C",
+    use_locale: bool = True,
+    sns_style: str = "whitegrid",
+    label_palette: Mapping[str, str] | Sequence[str] | None = None,
+    legend_label_map: Mapping[str, str] | None = None,
+    point_size: int | None = None
 ):
     """
     Convenience wrapper: project embeddings and produce scatter plot.
@@ -162,6 +246,14 @@ def plot_top_tokens_projection(
         output_path=output_path,
         annotate_tokens=annotate_tokens,
         legend_location=legend_location,
+        figure_size=figure_size,
+        figure_fraction=figure_fraction,
+        locale_name=locale_name,
+        use_locale=use_locale,
+        sns_style=sns_style,
+        label_palette=label_palette,
+        legend_label_map=legend_label_map,
+        point_size=point_size,
     )
 
     return frame, fig, ax
@@ -202,3 +294,37 @@ def plot_training_curves(
         fig.savefig(output_path, dpi=300)
 
     return fig, axes
+
+
+def plot_oov_barplot(
+    data: pd.DataFrame | Mapping[str, Sequence],
+    x: str = "label",
+    y: str = "oov_token_occurrences",
+    title: str = "OOV token occurrences by topic",
+    rotation: float = 45.0,
+    figure_fraction: float = 0.75,
+    locale_name: str = "C",
+    use_locale: bool = True,
+    sns_style: str = "whitegrid",
+) -> tuple[plt.Figure, plt.Axes]:
+    """
+    Render a bar plot showing OOV counts per label.
+    """
+
+    if isinstance(data, pd.DataFrame):
+        frame = data
+    else:
+        frame = pd.DataFrame(data)
+
+    rc = locale_parameters(locale_name) if use_locale else None
+    sns.set(style=sns_style, rc=rc)
+    fig, ax = plt.subplots(figsize=latex_set_size(fraction=figure_fraction))
+    sns.barplot(data=frame, x=x, y=y, ax=ax)
+
+    ax.set_title(title)
+    ax.set_xlabel(x.replace("_", " ").title())
+    ax.set_ylabel(y.replace("_", " ").title())
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=rotation)
+
+    fig.tight_layout()
+    return fig, ax
