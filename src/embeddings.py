@@ -92,6 +92,7 @@ class EmbeddingLoaderResult:
 def load_glove_embeddings(
     config: EmbeddingConfig,
     vocabulary: Vocabulary,
+    oov_strategy: str = "sif",
 ) -> EmbeddingLoaderResult:
     """
     Load GloVe-style embeddings (plain text, token followed by floats per line).
@@ -125,6 +126,7 @@ def load_glove_embeddings(
         embedding_matrix,
         vocabulary,
         oov_tokens,
+        strategy=oov_strategy,
     )
     return EmbeddingLoaderResult(
         matrix=embedding_matrix,
@@ -141,6 +143,7 @@ def load_torchtext_glove(
     dim: int = 100,
     trainable: bool = True,
     random_seed: int = 7,
+    oov_strategy: str = "sif",
 ) -> EmbeddingLoaderResult:
     """
     Load GloVe embeddings via torchtext's downloader.
@@ -179,6 +182,7 @@ def load_torchtext_glove(
         embedding_matrix,
         vocabulary,
         oov_tokens,
+        strategy=oov_strategy,
     )
     return EmbeddingLoaderResult(
         matrix=embedding_matrix,
@@ -187,18 +191,99 @@ def load_torchtext_glove(
         mitigated_tokens=mitigated,
     )
 
+def get_weighted_mean_vector(
+    embedding_matrix: np.ndarray,
+    vocabulary: Vocabulary,
+    oov_tokens: set[str] | None = None,
+    sif_alpha: float = 0.001,
+) -> np.ndarray:
+    """
+    Compute SIF-weighted mean vector of in-vocabulary embeddings.
+    
+    Args:
+        embedding_matrix: Embedding matrix of shape (vocab_size, embedding_dim)
+        vocabulary: Vocabulary with frequency information
+        oov_tokens: Set of OOV tokens to exclude from computation
+        sif_alpha: SIF smoothing parameter (default 0.001)
+    
+    Returns:
+        Weighted mean embedding vector
+    """
+    if oov_tokens is None:
+        oov_tokens = set()
+    
+    in_vocab_tokens = [
+        (token, idx)
+        for token, idx in vocabulary.token_to_index.items()
+        if token not in {"<pad>", "<unk>"} and token not in oov_tokens
+    ]
+    
+    if not in_vocab_tokens:
+        return embedding_matrix.mean(axis=0)
+    
+    # total frequency for calculating probability
+    total_freq = sum(vocabulary.frequencies.get(token, 0) for token, _ in in_vocab_tokens)
+    
+    if total_freq == 0:
+        indices = [idx for _, idx in in_vocab_tokens]
+        return embedding_matrix[indices].mean(axis=0)
+    
+    weights = []
+    embeddings = []
+    
+    for token, idx in in_vocab_tokens:
+        freq = vocabulary.frequencies.get(token, 0)
+        prob = freq / total_freq
+        sif_weight = sif_alpha / (sif_alpha + prob)
+        weights.append(sif_weight)
+        embeddings.append(embedding_matrix[idx])
+    
+    weights = np.array(weights)
+    embeddings = np.array(embeddings)
+    
+    weights = weights / weights.sum()
+    
+    # weighted mean
+    return np.dot(weights, embeddings)
+
+
+def get_simple_mean_vector(
+    embedding_matrix: np.ndarray,
+    vocabulary: Vocabulary,
+    oov_tokens: set[str] | None = None,
+) -> np.ndarray:
+    if oov_tokens is None:
+        oov_tokens = set()
+    
+    in_vocab_indices = [
+        idx
+        for token, idx in vocabulary.token_to_index.items()
+        if token not in {"<pad>", "<unk>"} and token not in oov_tokens
+    ]
+    
+    if not in_vocab_indices:
+        return embedding_matrix.mean(axis=0)
+    
+    return embedding_matrix[in_vocab_indices].mean(axis=0)
+
+
+def get_zero_vector(embedding_dim: int) -> np.ndarray:
+    return np.zeros(embedding_dim, dtype=np.float32)
+
 
 def mitigate_oov_embeddings(
     embedding_matrix: np.ndarray,
     vocabulary: Vocabulary,
     oov_tokens: set[str],
+    strategy: str = "sif",
 ) -> Mapping[str, np.ndarray]:
     """
-    Naively mitigate OOV tokens by assigning them the global mean embedding.
-
-    This simple strategy gives OOV tokens a deterministic starting point rather
-    than random noise, while keeping the vectors trainable so the model can adapt
-    them during learning.
+    Mitigate OOV tokens using specified strategy.
+    
+    Strategies:
+    - "sif": SIF-weighted mean (default)
+    - "mean": Simple mean of in-vocab embeddings
+    - "zero": Zero vector initialization
     """
 
     mitigated: dict[str, np.ndarray] = {}
@@ -206,23 +291,29 @@ def mitigate_oov_embeddings(
     if not oov_tokens:
         return mitigated
 
-    in_vocab_indices = [
-        idx
-        for token, idx in vocabulary.token_to_index.items()
-        if token not in {"<pad>", "<unk>"} and token not in oov_tokens
-    ]
-
-    if not in_vocab_indices:
-        return mitigated
-
-    mean_vector = embedding_matrix[in_vocab_indices].mean(axis=0)
+    if strategy == "sif":
+        init_vector = get_weighted_mean_vector(
+            embedding_matrix,
+            vocabulary,
+            oov_tokens=oov_tokens,
+        )
+    elif strategy == "mean":
+        init_vector = get_simple_mean_vector(
+            embedding_matrix,
+            vocabulary,
+            oov_tokens=oov_tokens,
+        )
+    elif strategy == "zero":
+        init_vector = get_zero_vector(embedding_matrix.shape[1])
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
 
     for token in sorted(oov_tokens):
         token_index = vocabulary.token_to_index.get(token)
         if token_index is None:
             continue
-        embedding_matrix[token_index] = mean_vector.copy()
-        mitigated[token] = mean_vector.copy()
+        embedding_matrix[token_index] = init_vector.copy()
+        mitigated[token] = init_vector.copy()
 
     return mitigated
 
