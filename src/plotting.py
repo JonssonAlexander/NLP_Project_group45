@@ -10,6 +10,7 @@ from typing import Any, Mapping, Sequence
 import locale
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 import pandas as pd
 import seaborn as sns
 from sklearn.decomposition import PCA
@@ -263,14 +264,25 @@ def plot_training_curves(
     history: TrainingHistory,
     title: str = "Training dynamics",
     output_path: Path | None = None,
+    locale_name: str = "C",
+    use_locale: bool = True,
+    sns_style: str = "whitegrid",
+    figure_fraction: float | None = None,
 ):
     """
     Plot training loss and validation accuracy curves.
     """
 
     epochs = range(1, len(history.train_loss) + 1)
-    sns.set(style="whitegrid")
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    rc = locale_parameters(locale_name) if use_locale else None
+    sns.set(style=sns_style, rc=rc)
+
+    if figure_fraction:
+        width, height = latex_set_size(fraction=figure_fraction)
+        figsize = (width * 2, height)
+    else:
+        figsize = (12, 4)
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
 
     axes[0].plot(epochs, history.train_loss, label="Train loss")
     axes[0].plot(epochs, history.val_loss, label="Val loss")
@@ -285,6 +297,13 @@ def plot_training_curves(
     axes[1].set_ylabel("Accuracy")
     axes[1].set_title("Accuracy")
     axes[1].legend()
+
+    if use_locale:
+        def _format_float(value: float, _pos: int) -> str:
+            return locale.format_string("%.3f", value)
+
+        axes[0].yaxis.set_major_formatter(ticker.FuncFormatter(_format_float))
+        axes[1].yaxis.set_major_formatter(ticker.FuncFormatter(_format_float))
 
     fig.suptitle(title)
     fig.tight_layout()
