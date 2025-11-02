@@ -11,6 +11,7 @@ import locale
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import ticker
+from matplotlib.ticker import MaxNLocator
 import pandas as pd
 import seaborn as sns
 from sklearn.decomposition import PCA
@@ -284,19 +285,24 @@ def plot_training_curves(
         figsize = (12, 4)
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
-    axes[0].plot(epochs, history.train_loss, label="Train loss")
-    axes[0].plot(epochs, history.val_loss, label="Val loss")
+    axes[0].plot(epochs, history.train_loss, ls="-o", label="Train loss")
+    axes[0].plot(epochs, history.val_loss, ls="-o", label="Val loss")
     axes[0].set_xlabel("Epoch")
     axes[0].set_ylabel("Loss")
     axes[0].set_title("Loss")
     axes[0].legend()
 
-    axes[1].plot(epochs, history.train_accuracy, label="Train acc")
-    axes[1].plot(epochs, history.val_accuracy, label="Val acc")
+    axes[1].plot(epochs, history.train_accuracy, "-o", label="Train acc")
+    axes[1].plot(epochs, history.val_accuracy, "-o", label="Val acc")
     axes[1].set_xlabel("Epoch")
     axes[1].set_ylabel("Accuracy")
     axes[1].set_title("Accuracy")
     axes[1].legend()
+    axes[0].xaxis.set_major_locator(MaxNLocator(integer=True))
+    axes[1].xaxis.set_major_locator(MaxNLocator(integer=True))
+    max_epoch = len(history.train_loss)
+    axes[0].set_xlim(1, max_epoch)
+    axes[1].set_xlim(1, max_epoch)
 
     if use_locale:
         def _format_float(value: float, _pos: int) -> str:
@@ -305,7 +311,7 @@ def plot_training_curves(
         axes[0].yaxis.set_major_formatter(ticker.FuncFormatter(_format_float))
         axes[1].yaxis.set_major_formatter(ticker.FuncFormatter(_format_float))
 
-    fig.suptitle(title)
+    fig.suptitle(title,fontsize=18)
     fig.tight_layout()
 
     if output_path is not None:
