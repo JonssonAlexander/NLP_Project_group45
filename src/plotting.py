@@ -7,7 +7,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-import locale
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import ticker
@@ -36,11 +35,10 @@ def latex_set_size(width: float = 455.24411, fraction: float = 1) -> tuple[float
     return fig_width_in, fig_height_in
 
 
-def locale_parameters(locale_name: str = "C") -> dict[str, object]:
+def locale_parameters() -> dict[str, object]:
     """
-    Configure matplotlib and locale settings for consistent number formatting.
+    Configure matplotlib font defaults for consistent typography.
     """
-
     rc_overrides = {
         "mathtext.fontset": "stix",
         "font.family": ["STIXGeneral"],
@@ -49,9 +47,6 @@ def locale_parameters(locale_name: str = "C") -> dict[str, object]:
         "font.monospace": ["STIXGeneral"],
     }
     plt.rcParams.update(rc_overrides)
-
-    locale.setlocale(locale.LC_NUMERIC, locale_name)
-    plt.rcParams["axes.formatter.use_locale"] = locale_name.lower() != "c"
     return rc_overrides
 
 
@@ -121,10 +116,6 @@ def plot_embedding_scatter(
     output_path: Path | None = None,
     annotate_tokens: bool = True,
     legend_location: str = "right",
-    figure_size: tuple[float, float] | None = None,
-    figure_fraction: float | None = None,
-    locale_name: str = "C",
-    use_locale: bool = True,
     sns_style: str = "whitegrid",
     label_palette: Mapping[str, str] | Sequence[str] | None = None,
     legend_label_map: Mapping[str, str] | None = None,
@@ -134,14 +125,10 @@ def plot_embedding_scatter(
     Scatter plot helper for 2D embedding projections.
     """
 
-    rc = locale_parameters(locale_name) if use_locale else None
+    rc = locale_parameters()
     sns.set(style=sns_style, rc=rc)
-
-    if figure_size is None:
-        if figure_fraction is not None:
-            figure_size = latex_set_size(fraction=figure_fraction)
-        else:
-            figure_size = (10, 7)
+    
+    figure_size = latex_set_size()
 
     fig, ax = plt.subplots(figsize=figure_size)
 
@@ -174,9 +161,9 @@ def plot_embedding_scatter(
             remapped_labels.append(mapped)
         handles, labels = remapped_handles, remapped_labels
 
-    ax.set_title(title)
-    ax.set_xlabel("Component 1")
-    ax.set_ylabel("Component 2")
+    ax.set_title(title,fontsize=18)
+    ax.set_xlabel("Component 1",fontsize=14)
+    ax.set_ylabel("Component 2",fontsize=14)
 
     if legend_location == "bottom":
         ax.legend(
@@ -222,8 +209,6 @@ def plot_top_tokens_projection(
     tsne_perplexity: float = 30.0,
     figure_size: tuple[float, float] | None = None,
     figure_fraction: float | None = None,
-    locale_name: str = "C",
-    use_locale: bool = True,
     sns_style: str = "whitegrid",
     label_palette: Mapping[str, str] | Sequence[str] | None = None,
     legend_label_map: Mapping[str, str] | None = None,
@@ -248,10 +233,6 @@ def plot_top_tokens_projection(
         output_path=output_path,
         annotate_tokens=annotate_tokens,
         legend_location=legend_location,
-        figure_size=figure_size,
-        figure_fraction=figure_fraction,
-        locale_name=locale_name,
-        use_locale=use_locale,
         sns_style=sns_style,
         label_palette=label_palette,
         legend_label_map=legend_label_map,
@@ -265,8 +246,6 @@ def plot_training_curves(
     history: TrainingHistory,
     title: str = "Training dynamics",
     output_path: Path | None = None,
-    locale_name: str = "C",
-    use_locale: bool = True,
     sns_style: str = "whitegrid",
     figure_fraction: float | None = None,
 ):
@@ -275,7 +254,7 @@ def plot_training_curves(
     """
 
     epochs = range(1, len(history.train_loss) + 1)
-    rc = locale_parameters(locale_name) if use_locale else None
+    rc = locale_parameters()
     sns.set(style=sns_style, rc=rc)
 
     if figure_fraction:
@@ -304,12 +283,11 @@ def plot_training_curves(
     axes[0].set_xlim(1, max_epoch)
     axes[1].set_xlim(1, max_epoch)
 
-    if use_locale:
-        def _format_float(value: float, _pos: int) -> str:
-            return locale.format_string("%.3f", value)
+    def _format_float(value: float, _pos: int) -> str:
+        return f"{value:.3f}"
 
-        axes[0].yaxis.set_major_formatter(ticker.FuncFormatter(_format_float))
-        axes[1].yaxis.set_major_formatter(ticker.FuncFormatter(_format_float))
+    axes[0].yaxis.set_major_formatter(ticker.FuncFormatter(_format_float))
+    axes[1].yaxis.set_major_formatter(ticker.FuncFormatter(_format_float))
 
     fig.suptitle(title,fontsize=18)
     fig.tight_layout()
@@ -321,35 +299,25 @@ def plot_training_curves(
     return fig, axes
 
 
-def plot_oov_barplot(
-    data: pd.DataFrame | Mapping[str, Sequence],
-    x: str = "label",
-    y: str = "oov_token_occurrences",
-    title: str = "OOV token occurrences by topic",
-    rotation: float = 45.0,
-    figure_fraction: float = 0.75,
-    locale_name: str = "C",
-    use_locale: bool = True,
-    sns_style: str = "whitegrid",
+def plot_barplot(
+    x: Sequence[Any],
+    y: Sequence[float | int],
+    title: str,
 ) -> tuple[plt.Figure, plt.Axes]:
     """
-    Render a bar plot showing OOV counts per label.
+    Render a bar plot for the provided x/y values.
     """
 
-    if isinstance(data, pd.DataFrame):
-        frame = data
-    else:
-        frame = pd.DataFrame(data)
+    frame = pd.DataFrame({"x": x, "y": y})
+    rc = locale_parameters()
+    sns.set(style="whitegrid", rc=rc)
+    fig, ax = plt.subplots(figsize=latex_set_size(fraction=1))
+    sns.barplot(data=frame, x="x", y="y", ax=ax)
 
-    rc = locale_parameters(locale_name) if use_locale else None
-    sns.set(style=sns_style, rc=rc)
-    fig, ax = plt.subplots(figsize=latex_set_size(fraction=figure_fraction))
-    sns.barplot(data=frame, x=x, y=y, ax=ax)
-
-    ax.set_title(title)
-    ax.set_xlabel(x.replace("_", " ").title())
-    ax.set_ylabel(y.replace("_", " ").title())
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=rotation)
+    ax.set_title(title,fontsize=18)
+    ax.set_xlabel("Label",fontsize=14)
+    ax.set_ylabel("Counts",fontsize=14)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
 
     fig.tight_layout()
     return fig, ax
