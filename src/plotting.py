@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import colors
 from matplotlib import ticker
 from matplotlib.ticker import MaxNLocator
 import pandas as pd
@@ -257,31 +258,29 @@ def plot_training_curves(
     rc = locale_parameters()
     sns.set(style=sns_style, rc=rc)
 
-    if figure_fraction:
-        width, height = latex_set_size(fraction=figure_fraction)
-        figsize = (width * 2, height)
-    else:
-        figsize = (12, 4)
+    width, height = latex_set_size(fraction=figure_fraction)
+    figsize = (width * 2, height)
+    
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
-    axes[0].plot(epochs, history.train_loss, ls="-o", label="Train loss")
-    axes[0].plot(epochs, history.val_loss, ls="-o", label="Val loss")
-    axes[0].set_xlabel("Epoch")
-    axes[0].set_ylabel("Loss")
-    axes[0].set_title("Loss")
+    axes[0].plot(epochs, history.train_loss, "-o", label="Training")
+    axes[0].plot(epochs, history.val_loss, "-o", label="Validation")
+    axes[0].set_xlabel("Epoch",fontsize=14)
+    axes[0].set_ylabel("Loss",fontsize=14)
+    axes[0].set_title("Loss",fontsize=14)
     axes[0].legend()
 
-    axes[1].plot(epochs, history.train_accuracy, "-o", label="Train acc")
-    axes[1].plot(epochs, history.val_accuracy, "-o", label="Val acc")
-    axes[1].set_xlabel("Epoch")
-    axes[1].set_ylabel("Accuracy")
-    axes[1].set_title("Accuracy")
+    axes[1].plot(epochs, history.train_accuracy, "-o", label="Training")
+    axes[1].plot(epochs, history.val_accuracy, "-o", label="Validation")
+    axes[1].set_xlabel("Epoch",fontsize=14)
+    axes[1].set_ylabel("Accuracy",fontsize=14)
+    axes[1].set_title("Accuracy",fontsize=14)
     axes[1].legend()
     axes[0].xaxis.set_major_locator(MaxNLocator(integer=True))
     axes[1].xaxis.set_major_locator(MaxNLocator(integer=True))
     max_epoch = len(history.train_loss)
-    axes[0].set_xlim(1, max_epoch)
-    axes[1].set_xlim(1, max_epoch)
+    axes[0].set_xlim(0.95, max_epoch+0.05)
+    axes[1].set_xlim(0.95, max_epoch+0.05)
 
     def _format_float(value: float, _pos: int) -> str:
         return f"{value:.3f}"
@@ -321,3 +320,112 @@ def plot_barplot(
 
     fig.tight_layout()
     return fig, ax
+
+
+def plot_support_and_f1_by_topic(
+    label_rows: pd.DataFrame,
+    *,
+    accuracy_col: str = "accuracy",
+    support_col: str = "support",
+    f1_col: str = "f1-score",
+    figsize: tuple[float, float] | None = None,
+    accuracy_cmap: str = "magma",
+    support_title: str = "Support by topic (color = accuracy)",
+    f1_title: str = "F1 score by topic (color = accuracy)",
+    xlabel: str = "Topic",
+    support_ylabel: str = "Support",
+    f1_ylabel: str = "F1 score",
+    accuracy_label: str = "Accuracy",
+    support_output_path: Path | None = None,
+    f1_output_path: Path | None = None,
+    xtick_rotation: float = 45,
+    accuracy_text_offset: float = 5.0,
+    f1_text_offset: float = 0.02,
+    show: bool = True,
+) -> tuple[tuple[plt.Figure, plt.Axes], tuple[plt.Figure, plt.Axes]]:
+    """
+    Plot support and F1 score per topic, colouring bars by accuracy.
+    """
+  
+
+    topics = label_rows.index.to_list()
+    accuracy_values = label_rows[accuracy_col].clip(0, 1)
+    vmin, vmax = float(accuracy_values.min()), float(accuracy_values.max())
+    if np.isclose(vmin, vmax):
+        vmin, vmax = 0.0, 1.0
+    cmap = plt.cm.get_cmap(accuracy_cmap)
+    norm = colors.Normalize(vmin=vmin, vmax=vmax)
+    accuracy_colors = cmap(norm(accuracy_values))
+
+    if figsize is None:
+        width, height = latex_set_size()
+        figsize = (width * 2, height)
+
+    rc = locale_parameters()
+    sns.set(style="whitegrid", rc=rc)
+
+    support_fig, support_ax = plt.subplots(figsize=figsize)
+    support_bars = support_ax.bar(
+        topics,
+        label_rows[support_col],
+        color=accuracy_colors,
+    )
+    support_ax.set_xlabel(xlabel,fontsize=14)
+    support_ax.set_ylabel(support_ylabel,fontsize=14)
+    support_ax.set_title(support_title,fontsize=18)
+    max_support = float(label_rows[support_col].max())
+    support_ax.set_ylim(0, max(1.0, max_support * 1.1))
+    for bar, accuracy in zip(support_bars, accuracy_values):
+        support_ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + accuracy_text_offset,
+            f"{accuracy:.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+    support_sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    support_sm.set_array([])
+    support_fig.colorbar(support_sm, ax=support_ax, label=accuracy_label)
+    support_ax.tick_params(axis="x", rotation=xtick_rotation)
+    support_fig.tight_layout()
+
+    f1_fig, f1_ax = plt.subplots(figsize=figsize)
+    f1_bars = f1_ax.bar(
+        topics,
+        label_rows[f1_col],
+        color=accuracy_colors,
+    )
+    f1_ax.set_xlabel(xlabel,fontsize=14)
+    f1_ax.set_ylabel(f1_ylabel,fontsize=14)
+    f1_ax.set_title(f1_title,fontsize=18)
+    f1_ax.set_ylim(0, 1.05)
+    for bar, score in zip(f1_bars, label_rows[f1_col]):
+        f1_ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + f1_text_offset,
+            f"{score:.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+    f1_sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    f1_sm.set_array([])
+    f1_fig.colorbar(f1_sm, ax=f1_ax, label=accuracy_label)
+    f1_ax.tick_params(axis="x", rotation=xtick_rotation)
+    f1_fig.tight_layout()
+
+    if support_output_path is not None:
+        support_output_path = Path(support_output_path)
+        support_output_path.parent.mkdir(parents=True, exist_ok=True)
+        support_fig.savefig(support_output_path, dpi=300)
+
+    if f1_output_path is not None:
+        f1_output_path = Path(f1_output_path)
+        f1_output_path.parent.mkdir(parents=True, exist_ok=True)
+        f1_fig.savefig(f1_output_path, dpi=300)
+
+    if show:
+        plt.show()
+
+    return (support_fig, support_ax), (f1_fig, f1_ax)
