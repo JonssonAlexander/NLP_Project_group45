@@ -316,7 +316,7 @@ def plot_barplot(
     ax.set_title(title,fontsize=18)
     ax.set_xlabel("Label",fontsize=14)
     ax.set_ylabel("Counts",fontsize=14)
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+    ax.tick_params(axis="x", rotation=45)
 
     fig.tight_layout()
     return fig, ax
@@ -359,7 +359,7 @@ def plot_support_and_f1_by_topic(
 
     if figsize is None:
         width, height = latex_set_size()
-        figsize = (width * 2, height)
+        figsize = (width, height)
 
     rc = locale_parameters()
     sns.set(style="whitegrid", rc=rc)
