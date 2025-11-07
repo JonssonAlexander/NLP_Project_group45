@@ -8,7 +8,7 @@ train_filename: train_5500.label
 test_filename: TREC_10.label
 train_split_ratio: 0.8
 shuffle_seed: 42
-fine_grained: true
+fine_grained: false
 tokenisation:
   use_spacy: true
   language_model: en_core_web_sm
