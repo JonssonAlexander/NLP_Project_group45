@@ -3,3 +3,5 @@ __pycache__
 .vector_cache
 notebooks
 03_enhancements.ipynb
+plots
+scripts
