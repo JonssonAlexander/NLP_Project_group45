@@ -269,7 +269,13 @@ This combined representation is passed through a 1D convolution layer and a tanh
 
 **Model Comparison Summary**
 
-<img src="plots/part3_model_accuracy_comparison.png" width="500" alt="Model accuracy comparison" />
+| Model              | Validation Accuracy |  Test Accuracy |
+|--------------------|---------------------|----------------|
+| **RCNN**           |        0.894        |    **0.922**   |
+| **BiGRU**          |        0.863        |      0.896     |
+| **CNN**            |        0.861        |      0.894     |
+| **BiLSTM**         |        0.854        |      0.884     |
+| **RNN (Baseline)** |        0.846        |      0.848     |
 
 **Key Takeaway:**  
 RCNN > BiGRU > CNN > BiLSTM > Baseline RNN.  
