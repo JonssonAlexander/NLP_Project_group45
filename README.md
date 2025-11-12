@@ -287,15 +287,22 @@ Bidirectionality and hybrid architectures yield clear performance improvements.
 We applied focused strategies to improve the weaker topics `ENTY` and `ABBR`.
 
 #### ENTY Improvement
-- Implemented `rcnn_improved_enty` with coarse splits and multisample dropout.  
-- Focused on entity-type questions (“Who”, “What”, “Where”).  
-- **Outcome:** Slight accuracy increase; benefits from targeted fine-tuning.
+The ENTY category had many small subtypes (like animals, foods, or inventions), which made it harder for the model to learn clear boundaries. It often confused ENTY with similar categories such as `DESC` or `HUM`.
+
+To fix this, we built on the RCNN model and added an extra coarse-topic training objective that helped the model better group examples from the same main topic together.  
+This adjustment made the model more consistent when predicting general topic types.
+
+**Result:**  
+The ENTY category showed a clear improvement in accuracy, meaning the model learned to recognize entity-type questions more reliably.
 
 <img src="plots/part3_rcnn_enty_improved_topic_accuracy.png" width="500" alt="RCNN topic accuracy" />
 
 #### ABBR Improvement
-- Implemented `rcnn_improved_abbr` with 3× oversampling and class weighting.  
-- **Outcome:** Limited gains due to very few examples (only 9 in test set).  
-  More data would be required for substantial improvement.
+The ABBR category had very few examples (only 9 in the test set), making it difficult for the model to learn abbreviation patterns. 
+
+We tried to solve this by oversampling ABBR examples during training, giving the model more chances to see them.
+
+**Result:**  
+There was no noticeable improvement in ABBR accuracy. Because there were so few samples, the model could not generalize well, even with extra training. More data would be required for substantial improvement.
 
 <img src="plots/part3_rcnn_abbr_improved_topic_accuracy.png" width="500" alt="RCNN topic accuracy" />
