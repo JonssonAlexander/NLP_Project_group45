@@ -200,15 +200,96 @@ The best model (max pooling without dropout) improves accuracy across all catego
 
 ## Part 3 – Enhancements
 
-- [x] 3.1 biRNN experiments (biLSTM, biGRU) with training curves. Double check, especially the RNN score which doesnt behave like it used to.
-- [x] 3.2 CNN experiment
-- [ ] 3.3
-- [ ] 3.4
+### Question 3(a): Bidirectional RNNs (BiLSTM & BiGRU)
 
-    <img src="plots/part3_bilstm_curves.png" width="300" alt="biLSTM curves" />
-    <img src="plots/part3_bigru_curves.png" width="300" alt="biGRU curves" />
-    <img src="plots/part3_cnn_curves.png" width="300" alt="CNN curves" />
+We replaced the baseline RNN with two bidirectional variants to capture both forward and backward context.
 
-    <img src="plots/part3_bilstm_topic_accuracy.png" width="300" alt="biLSTM topic accuracy (not plotted!)" />
-    <img src="plots/part3_bigru_topic_accuracy.png" width="300" alt="biGRU topic accuracy" />
-    <img src="plots/part3_cnn_topic_accuracy.png" width="300" alt="CNN topic accuracy" />
+- **BiLSTM** – Retains long-range dependencies through gated memory cells  
+- **BiGRU** – A lighter, faster alternative that uses fewer parameters
+
+**Results**
+
+| Model  | Validation Accuracy | Test Accuracy |
+|--------|---------------------|---------------|
+| BiLSTM |        0.854        |     0.884     |
+| BiGRU  |        0.863        |     0.896     |
+
+**Training Curves**
+
+<img src="plots/part3_bilstm_curves.png" width="400" alt="biLSTM training curves" />
+<img src="plots/part3_bigru_curves.png" width="400" alt="biGRU training curves" />
+
+
+
+### Question 3(b): Convolutional Model (CNN)
+
+We introduced a CNN text classifier to capture local n-gram patterns without recurrence.  
+
+**Results**
+
+| Model | Validation Accuracy | Test Accuracy |
+|-------|---------------------|---------------|
+|  CNN  |         0.861       |     0.894     |
+
+**Training Curves**
+
+<img src="plots/part3_cnn_curves.png" width="400" alt="CNN training curves" />
+
+
+### Question 3(c): Further Model Improvement
+
+We used a Recurrent Convolutional Neural Network (RCNN) which integrates the strengths of both recurrent and convolutional architectures.  
+
+It first applies a bidirectional GRU to capture long-range contextual information from both directions of the sentence, then concatenates these contextual embeddings with the original word embeddings.  
+This combined representation is passed through a 1D convolution layer and a tanh activation, followed by a global max-pooling operation to extract the most significant features across the sequence before classification.
+
+**Results**
+
+| Model | Validation Accuracy | Test Accuracy |
+|-------|---------------------|---------------|
+|  RCNN |        0.894        |     0.922     |
+
+**Training Curves**
+
+<img src="plots/part3_3_rcnn_curves.png" width="400" alt="RCNN training curves" />
+
+**Topic-wise Analysis**
+
+| Topic | Accuracy | Support |
+|-------|----------|---------|
+| ABBR  | 0.778    | 9       |
+| ENTY  | 0.798    | 94      |
+| NUM   | 0.920    | 113     |
+| LOC   | 0.938    | 81      |
+| HUM   | 0.969    | 65      |
+| DESC  | 0.986    | 138     |
+
+<img src="plots/part3_rcnn_topic_accuracy.png" width="500" alt="RCNN topic accuracy" />
+
+
+**Model Comparison Summary**
+
+<img src="plots/part3_model_accuracy_comparison.png" width="500" alt="Model accuracy comparison" />
+
+**Key Takeaway:**  
+RCNN > BiGRU > CNN > BiLSTM > Baseline RNN.  
+Bidirectionality and hybrid architectures yield clear performance improvements.
+
+
+### Question 3(d): Targeted Improvements (Weaker Topics)
+
+We applied focused strategies to improve the weaker topics `ENTY` and `ABBR`.
+
+#### ENTY Improvement
+- Implemented `rcnn_improved_enty` with coarse splits and multisample dropout.  
+- Focused on entity-type questions (“Who”, “What”, “Where”).  
+- **Outcome:** Slight accuracy increase; benefits from targeted fine-tuning.
+
+<img src="plots/part3_rcnn_enty_improved_topic_accuracy.png" width="500" alt="RCNN topic accuracy" />
+
+#### ABBR Improvement
+- Implemented `rcnn_improved_abbr` with 3× oversampling and class weighting.  
+- **Outcome:** Limited gains due to very few examples (only 9 in test set).  
+  More data would be required for substantial improvement.
+
+<img src="plots/part3_rcnn_abbr_improved_topic_accuracy.png" width="500" alt="RCNN topic accuracy" />
