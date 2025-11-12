@@ -322,6 +322,203 @@ def plot_barplot(
     return fig, ax
 
 
+def plot_topic_accuarcy(
+    topic_rows: pd.DataFrame,
+    *,
+    label_col: str = "label",
+    accuracy_col: str = "accuracy",
+    support_col: str = "support",
+    title: str = "Best configuration – topic accuracy",
+    output_path: str | Path = "plots/part2_best_topic_accuracy.png",
+    show: bool = True,
+) -> tuple[plt.Figure, plt.Axes]:
+    """Plot per-topic accuracy as a horizontal bar chart with support annotations."""
+
+    if label_col not in topic_rows or accuracy_col not in topic_rows:
+        raise ValueError("topic_rows must contain label and accuracy columns")
+
+    sorted_rows = topic_rows.sort_values(accuracy_col).copy()
+
+    rc = locale_parameters()
+    sns.set(style="whitegrid", rc=rc)
+
+    width, height = latex_set_size(fraction=1)
+    fig, ax = plt.subplots(figsize=(width, height))
+
+    bars = ax.barh(sorted_rows[label_col], sorted_rows[accuracy_col])
+    ax.set_xlabel("Accuracy", fontsize=14)
+    ax.set_ylabel("Topic", fontsize=14)
+    ax.set_title(title, fontsize=18)
+    ax.set_xlim(0, 1.05)
+
+    if support_col in sorted_rows:
+        labels = [
+            f"{acc:.2f} (n={supp})"
+            for acc, supp in zip(sorted_rows[accuracy_col], sorted_rows[support_col])
+        ]
+        ax.bar_label(bars, labels=labels, padding=4)
+
+    fig.tight_layout()
+
+    if output_path:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=300)
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+    return fig, ax
+
+
+def plot_heatmap(heatmap_data) -> tuple[plt.Figure, plt.Axes]:
+    """Render the regularisation validation heatmap and persist it to disk."""
+
+    rc = locale_parameters()
+    sns.set(style="whitegrid", rc=rc)
+
+    width, height = latex_set_size(fraction=1)
+    fig, ax = plt.subplots(figsize=(width, height))
+    sns.heatmap(
+        heatmap_data,
+        annot=True,
+        fmt=".3f",
+        cmap="viridis",
+        cbar_kws={"label": "Validation accuracy"},
+        ax=ax,
+    )
+
+    ax.set_title("Validation accuracy across dropout and weight decay", size=18)
+    ax.set_xlabel("Dropout", fontsize=14)
+    ax.set_ylabel("Weight decay", fontsize=14)
+
+    fig.tight_layout()
+    output_path = Path("plots/part2_heatmap.png")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.show()
+
+    return fig, ax
+
+
+def oov_comparasion_plot(
+    strategy_histories: Mapping[str, TrainingHistory],
+    *,
+    strategies: Sequence[str] | None = None,
+    output_path: str | Path = "plots/oov_strategy_comparison.png",
+    show: bool = True,
+) -> dict[str, float]:
+    """Plot loss/accuracy curves for OOV strategies and report best validation accuracies."""
+
+    if not strategy_histories:
+        raise ValueError("strategy_histories must contain at least one entry.")
+
+    if strategies is None:
+        strategies = list(strategy_histories.keys())
+    else:
+        strategies = [strategy for strategy in strategies if strategy in strategy_histories]
+        if not strategies:
+            raise ValueError("Provided strategies are not present in strategy_histories.")
+
+    rc = locale_parameters()
+    sns.set(style="whitegrid", rc=rc)
+
+    width, height = latex_set_size(fraction=1)
+    fig, axes = plt.subplots(1, 2, figsize=(width * 2, height))
+
+    tab_palette = sns.color_palette("tab10")
+    default_indices = {"sif": 3, "mean": 1, "zero": 2}
+    colors_map: dict[str, Any] = {}
+    for strategy, idx in default_indices.items():
+        if strategy in strategies and idx < len(tab_palette):
+            colors_map[strategy] = tab_palette[idx]
+
+    available_colors = [
+        color for idx, color in enumerate(tab_palette) if idx not in default_indices.values()
+    ]
+    if not available_colors:
+        available_colors = tab_palette
+    color_idx = 0
+    for strategy in strategies:
+        if strategy not in colors_map:
+            colors_map[strategy] = available_colors[color_idx % len(available_colors)]
+            color_idx += 1
+
+    default_labels = {
+        "sif": "SIF-weighted",
+        "mean": "Simple mean",
+        "zero": "Zero vector",
+    }
+    strategy_labels = {
+        strategy: default_labels.get(strategy, strategy.replace("_", " ").title())
+        for strategy in strategies
+    }
+
+    for strategy in strategies:
+        history_obj = strategy_histories[strategy]
+        epochs = range(1, len(history_obj.train_loss) + 1)
+        color = colors_map[strategy]
+        axes[0].plot(epochs, history_obj.train_loss, linestyle="--", color=color, alpha=0.7)
+        axes[0].plot(epochs, history_obj.val_loss, linestyle="-", color=color)
+        axes[1].plot(epochs, history_obj.train_accuracy, linestyle="--", color=color, alpha=0.7)
+        axes[1].plot(epochs, history_obj.val_accuracy, linestyle="-", color=color)
+
+    axes[0].set_xlabel("Epoch", fontsize=14)
+    axes[0].set_ylabel("Loss", fontsize=14)
+    axes[0].set_title("Loss Comparison", fontsize=14)
+    axes[0].grid(True, alpha=0.3)
+
+    axes[1].set_xlabel("Epoch", fontsize=14)
+    axes[1].set_ylabel("Accuracy", fontsize=14)
+    axes[1].set_title("Accuracy Comparison", fontsize=14)
+    axes[1].grid(True, alpha=0.3)
+
+    dataset_handles = [
+        plt.Line2D([], [], color="black", linestyle="--", label="Training"),
+        plt.Line2D([], [], color="black", linestyle="-", label="Validation"),
+    ]
+    strategy_handles = [
+        plt.Line2D([], [], color=colors_map[strategy], lw=5, label=strategy_labels[strategy])
+        for strategy in strategies
+    ]
+
+    handles = dataset_handles + strategy_handles
+    labels = [handle.get_label() for handle in handles]
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.01),
+        ncol=len(handles),
+        frameon=False,
+    )
+
+    fig.suptitle("OOV Initialization Strategy Comparison", fontsize=18)
+    fig.tight_layout(rect=(0, 0.08, 1, 1))
+
+    if output_path:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=300, bbox_inches="tight")
+
+    best_val_accuracies: dict[str, float] = {}
+    print("Best validation accuracies:")
+    for strategy in strategies:
+        history_obj = strategy_histories[strategy]
+        best_val_acc = max(history_obj.val_accuracy) if history_obj.val_accuracy else 0.0
+        best_val_accuracies[strategy] = best_val_acc
+        print(f"  {strategy:6s}: {best_val_acc:.4f}")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+    return best_val_accuracies
+
+
 def plot_support_and_f1_by_topic(
     label_rows: pd.DataFrame,
     *,
